@@ -10,20 +10,15 @@ var conf = local;
 var rc = require('rc')('ref', conf);
 
 var program = require('commander');
+var options = require('../lib/options');
 
 // cli
 program
   .version(require('../package.json').version)
   .usage('<template> <output> [options]')
-  .option('-n, --name <string>', 'project name', conf.name)
-  .option('-d, --description <string>', 'project description', conf.description)
-  .option('-u, --username <name>', 'user legal name (e.g., Bob Ross)', conf.username)
-  .option('-e, --email <address>', 'user email address', conf.email)
-  .option('-s, --show-dependencies', 'render file showing module dependencies', conf.showDependencies)
-  .option('-p, --published <boolean>', 'whether or not the project is published', conf.published)
-  .option('--is-api', '', conf.isApi)
-  .option('--is-cli', '', conf.isCli)
-  .option('--is-stylus', '', conf.isStylus)
+
+// apply options
+options(program, conf);
 
 // parse args
 var args = program.parse(process.argv);
@@ -33,13 +28,14 @@ if (Path.basename(argv[0]) !== Path.basename(__filename)) argv.shift()
 
 var inFile = argv[1];
 var outFile = argv[2];
+var rest = argv.slice(2);
 
 if (!(inFile && outFile)) program.help();
 
 var data = merge(program, local, conf);
 
 if (data.isCli) {
-  exec(data.name + ' --help', function(err, stdout){
+  exec(data.name + ' --help ' + rest.join(' '), function(err, stdout){
     if (err) return console.error(err);
     data.usage = stdout;
     compile(complete);

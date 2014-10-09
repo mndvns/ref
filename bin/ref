@@ -1,87 +1,121 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env node
 
-DIRNAME="`which ref | xargs realpath | xargs dirname`"
-VERSION=0.1.0
+var conf = {};
+var rc = require('rc')('ref', conf);
+var spawn = require('child_process').spawn;
 
-usage() {
-  cat <<-EOF
+var pkg = require('../package.json');
+var version = pkg.version;
+var program = require('commander');
+var commands = conf.commands;
+var options = require('../lib/options');
 
-  Usage: ref [options] [command]
+// cli
+program
+  .version(version)
+  .usage('[options] <command>')
 
-  Options:
+// apply options
+options(program, conf);
 
-    -h, --help                   output help information
-    -V, --version                output version
+program.on('--help', function(){
+    console.log('  Commands:');
+    console.log();
+    console.log('    tag                          create and push annotated tag');
+    console.log('    readme                       generate Readme.md');
+    console.log('    license                      generate License');
+    console.log('    render <template> <output>   render template to output');
+    console.log();
+  });
 
-  Commands:
-
-    list                         list dependencies
-    install                      install dependencies
-    link <module ...>            create symlink to modules(s)
-
-    readme [options]             generate Readme.md
-    license [options]            generate License
-    render <template> <output>   render template to output
-
-    tag                          create annotated tag and push to remote
-
-EOF
+if (commands) {
+  program.on('--help', function(){
+    if (program.hideCustom) return;
+    console.log('  Custom Commands:');
+    console.log();
+    logCommands();
+    console.log();
+  });
 }
 
-fatal() { printf "\033[31m\n error \033[0m%s\n\n" "$@" }
+// parse args
+var args = program.parse(process.argv);
+var rest = process.argv.slice(2);
+var cmd = rest.shift();
 
-function write_license(){
-  ref-license 'Michael Vanasse' 'mail@mndvns.com' > License
-  cat License
+if (conf.commands && conf.commands[cmd]) {
+  run(parseCustom(cmd));
+} else {
+  switch (cmd) {
+    case 'readme': runRender('Readme.md'); break;
+    case 'license': runRender('License'); break;
+    case 'render': runRender(); break;
+    case 'tag': tag(); break;
+    default:
+      program.help();
+      process.exit(0);
+  };
 }
 
-function write_tag() {
-  local tag=$(node -p "require('./package.json').version")
-  git tag -a $tag -m "release $tag"
-  git push origin $tag
+function tag(){
+  run({cmd: 'git', args: ['tag', '-a', version, '-m', 'realease ' + version]}, function(){
+    run({cmd: 'git', args: ['push', 'origin', version]});
+  });
 }
 
-function get_deps() {
-  find lib -type f -name '*.styl' -exec grep "@require" {} \; \
-    | perl -n -e'/@require ([\w\W]+)/ && print "$1"' \
-    | tr -d "'" \
-    | grep -v -e '^\.'
+function runRender(name, output){
+  if (!name) {
+    name = rest.shift();
+    output = rest.shift();
+  }
+  output = output || name;
+  return run({cmd: 'ref-render', args: [name, output].concat(rest)});
 }
 
-function install_deps() {
-  get_deps | xargs npm install "$@"
+function parseCustom(handle){
+  var str = conf.commands[handle];
+  str = str.split('##');
+  var args = str.shift().trim();
+  var comment = str.shift().trim();
+  args = args.split(' ');
+  var cmd = args.shift().trim();
+  return {
+    handle: handle,
+    cmd: cmd,
+    args: args.concat(rest),
+    comment: comment
+  };
 }
 
-function link_deps() {
-  if test $# -eq 0; then
-    link_deps `get_deps | xargs echo`
-    return 0
-  fi
-  while test $# -ne 0; do
-    arg=$1
-    shift
-    npm link $arg
-  done
+function run(obj, fn){
+  fn = fn || noop;
+  var proc = spawn(obj.cmd, obj.args, {stdio: 'inherit'});
+  proc.on('exit', function(code){
+    if (code > 0) return process.exit(code);
+    fn();
+  });
+  return proc;
 }
 
-if test $# -eq 0; then
-  usage
-  exit
-fi
+function logCommands(){
+  var maxCmd = 0;
+  var maxArg = 0;
+  Object.keys(commands).map(function(c){
+    var v = parseCustom(c);
+    v = v.cmd + v.args + '`` ';
+    maxCmd = maxCmd > c.length ? maxCmd : c.length;
+    maxArg = maxArg > v.length ? maxArg : v.length;
+  });
+  maxCmd += 4;
+  maxArg += 4;
+  for (var k in commands) {
+    var cmd = parseCustom(k);
+    var cmdargs = '`' + cmd.cmd + ' ' + cmd.args + '`';
+    var w = 15;
+    var space1 = new Array(maxCmd).join(' ').slice(cmd.handle.length);
+    var space2 = new Array(maxArg).join(' ').slice(cmdargs.length);
+    console.log('    ' + cmd.handle + space1 + cmdargs + space2 + cmd.comment);
+  }
+}
 
-while test $# -ne 0; do
-  arg=$1
-  shift
-  case $arg in
-    -h|--help) usage; exit;;
-    -V|--version) echo $VERSION; exit;;
-    readme) ref-render Readme.md Readme.md "$@"; exit;;
-    license) ref-render License License "$@"; exit;;
-    render) ref-render "$@"; exit;;
-    ls|list) get_deps; exit;;
-    i|install|isntall|intsall) install_deps "$@"; exit;;
-    ln|link) link_deps "$@"; exit;;
-    tag) write_tag; exit;;
-    publish) npm publish; exit;;
-  esac
-done
+function noop(){}
