@@ -1,0 +1,92 @@
+#!/usr/bin/env zsh
+
+DIRNAME="`which ref | xargs realpath | xargs dirname`"
+VERSION=0.1.0
+
+usage() {
+  cat <<-EOF
+
+  Usage: ref [options] [command]
+
+  Options:
+
+    -h, --help       output help information
+    -V, --version    output version
+
+  Commands:
+
+    readme           generate Readme.md
+    license          generate License
+    tag              create annotated tag and push to remote
+    list             list dependencies
+    install          install dependencies
+    ln <module ...>  symlink to modules(s)
+
+EOF
+}
+
+fatal() { printf "\033[31m\n error \033[0m%s\n\n" "$@" }
+
+function write_readme(){
+  if test ! -f package.json; then
+    fatal "No package.json"
+    return 1
+  fi
+  ref-readme < $DIRNAME/../etc/Readme.md > Readme.md
+  cat Readme.md
+}
+
+function write_license(){
+  ref-license 'Michael Vanasse' 'mail@mndvns.com' > License
+  cat License
+}
+
+function write_tag() {
+  local tag=$(node -p "require('./package.json').version")
+  git tag -a $tag -m "release $tag"
+  git push origin $tag
+}
+
+function get_deps() {
+  find lib -type f -name '*.styl' -exec grep "@require" {} \; \
+    | perl -n -e'/@require ([\w\W]+)/ && print "$1"' \
+    | tr -d "'" \
+    | grep -v -e '^\.'
+}
+
+function install_deps() {
+  get_deps | xargs npm install "$@"
+}
+
+function link_deps() {
+  if test $# -eq 0; then
+    link_deps `get_deps | xargs echo`
+    return 0
+  fi
+  while test $# -ne 0; do
+    arg=$1
+    shift
+    npm link $arg
+  done
+}
+
+if test $# -eq 0; then
+  usage
+  exit
+fi
+
+while test $# -ne 0; do
+  arg=$1
+  shift
+  case $arg in
+    -h|--help) usage; exit;;
+    -V|--version) echo $VERSION; exit;;
+    readme) write_readme; exit;;
+    license) write_license; exit;;
+    ls|list) get_deps; exit;;
+    i|install|isntall|intsall) install_deps "$@"; exit;;
+    ln|link) link_deps "$@"; exit;;
+    tag) write_tag; exit;;
+    publish) npm publish; exit;;
+  esac
+done
