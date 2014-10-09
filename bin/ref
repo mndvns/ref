@@ -10,31 +10,25 @@ usage() {
 
   Options:
 
-    -h, --help       output help information
-    -V, --version    output version
+    -h, --help                   output help information
+    -V, --version                output version
 
   Commands:
 
-    readme           generate Readme.md
-    license          generate License
-    tag              create annotated tag and push to remote
-    list             list dependencies
-    install          install dependencies
-    ln <module ...>  symlink to modules(s)
+    list                         list dependencies
+    install                      install dependencies
+    link <module ...>            create symlink to modules(s)
+
+    readme [options]             generate Readme.md
+    license [options]            generate License
+    render <template> <output>   render template to output
+
+    tag                          create annotated tag and push to remote
 
 EOF
 }
 
 fatal() { printf "\033[31m\n error \033[0m%s\n\n" "$@" }
-
-function write_readme(){
-  if test ! -f package.json; then
-    fatal "No package.json"
-    return 1
-  fi
-  ref-readme < $DIRNAME/../etc/Readme.md > Readme.md
-  cat Readme.md
-}
 
 function write_license(){
   ref-license 'Michael Vanasse' 'mail@mndvns.com' > License
@@ -81,7 +75,8 @@ while test $# -ne 0; do
   case $arg in
     -h|--help) usage; exit;;
     -V|--version) echo $VERSION; exit;;
-    readme) write_readme; exit;;
+    readme) ref-render Readme.md Readme.md "$@"; exit;;
+    render) ref-render "$@"; exit;;
     license) write_license; exit;;
     ls|list) get_deps; exit;;
     i|install|isntall|intsall) install_deps "$@"; exit;;

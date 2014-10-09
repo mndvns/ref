@@ -1,0 +1,85 @@
+#!/usr/bin/env node
+
+var Handlebars = require('handlebars');
+var local = require(process.cwd() + '/package.json');
+var Path = require('path');
+var exec = require('child_process').exec;
+var fs = require('fs');
+
+var conf = local;
+var rc = require('rc')('ref', conf);
+
+var program = require('commander');
+
+// cli
+program
+  .version(require('../package.json').version)
+  .usage('<template> <output> [options]')
+  .option('-n, --name <string>', 'project name', conf.name)
+  .option('-d, --description <string>', 'project description', conf.description)
+  .option('-u, --username <name>', 'user legal name (e.g., Bob Ross)', conf.username)
+  .option('-e, --email <address>', 'user email address', conf.email)
+  .option('-s, --show-dependencies', 'render file showing module dependencies', conf.showDependencies)
+  .option('-p, --published <boolean>', 'whether or not the project is published', conf.published)
+  .option('--is-api', '', conf.isApi)
+  .option('--is-cli', '', conf.isCli)
+  .option('--is-stylus', '', conf.isStylus)
+
+// parse args
+var args = program.parse(process.argv);
+var argv = process.argv.slice(1);
+
+if (Path.basename(argv[0]) !== Path.basename(__filename)) argv.shift()
+
+var inFile = argv[1];
+var outFile = argv[2];
+
+if (!(inFile && outFile)) program.help();
+
+var data = merge(program, local, conf);
+
+if (data.isCli) {
+  exec(data.name + ' --help', function(err, stdout){
+    if (err) return console.error(err);
+    data.usage = stdout;
+    compile(complete);
+  });
+} else {
+  compile(complete);
+}
+
+
+function complete(str){
+  console.log(str);
+}
+
+function compile(fn){
+  fs.readFile(__dirname + '/../templates/' + inFile, 'utf8', function(err, str){
+    if (err) return console.error(err);
+    var template = Handlebars.compile(str);
+    var compiled = cleanup(template(data))
+    fs.writeFile(outFile, compiled, 'utf8', function(err){
+      if (err) return console.error(err);
+      fn(compiled);
+    })
+  });
+};
+
+function cleanup(str){
+  return str
+    .replace(/\n\n\n\n\n\n/g, '\n\n')
+    .replace(/\n\n\n\n\n/g, '\n\n')
+    .replace(/\n\n\n\n/g, '\n\n')
+    .replace(/\n\n\n/g, '\n\n');
+}
+
+function merge(a,b,c){
+  var z = {};
+  for (var k in c) if (c.hasOwnProperty(k) && typeof c[k] !== 'function') z[k] = c[k];
+  for (var k in b) if (b.hasOwnProperty(k) && typeof b[k] !== 'function') z[k] = b[k];
+  for (var k in a) if (a.hasOwnProperty(k) && typeof a[k] !== 'function') z[k] = a[k];
+  Object.keys(z).map(function(key){
+    if (key.charAt(0) === '_') delete z[key];
+  });
+  return z;
+}

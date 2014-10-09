@@ -4,12 +4,14 @@
   "description": "Does the stuff I hate",
   "bin": {
     "ref": "bin/ref",
-    "ref-readme": "bin/ref-readme",
+    "ref-render": "bin/ref-render",
     "ref-license": "bin/ref-license"
   },
   "main": "index.js",
   "dependencies": {
-    "handlebars": "~2.0.0"
+    "handlebars": "~2.0.0",
+    "rc": "^0.5.1",
+    "commander": "^2.3.0"
   },
   "devDependencies": {},
   "scripts": {
