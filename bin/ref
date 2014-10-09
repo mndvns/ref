@@ -76,8 +76,8 @@ while test $# -ne 0; do
     -h|--help) usage; exit;;
     -V|--version) echo $VERSION; exit;;
     readme) ref-render Readme.md Readme.md "$@"; exit;;
+    license) ref-render License License "$@"; exit;;
     render) ref-render "$@"; exit;;
-    license) write_license; exit;;
     ls|list) get_deps; exit;;
     i|install|isntall|intsall) install_deps "$@"; exit;;
     ln|link) link_deps "$@"; exit;;

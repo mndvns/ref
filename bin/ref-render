@@ -48,7 +48,6 @@ if (data.isCli) {
   compile(complete);
 }
 
-
 function complete(str){
   console.log(str);
 }
