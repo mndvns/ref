@@ -26,7 +26,7 @@ npm install {{name}}
 Via `{{name}} --help`:
 
 ```sh
-  {{usage}}
+  {{{usage}}}
 ```
 {{/if}}
 {{#if isApi}}

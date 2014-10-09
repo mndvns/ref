@@ -19,11 +19,11 @@ Via `ref --help`:
 
     list                         list dependencies
     install                      install dependencies
-    link &lt;module ...&gt;            create symlink to modules(s)
+    link <module ...>            create symlink to modules(s)
 
     readme [options]             generate Readme.md
     license [options]            generate License
-    render &lt;template&gt; &lt;output&gt;   render template to output
+    render <template> <output>   render template to output
 
     tag                          create annotated tag and push to remote
 
