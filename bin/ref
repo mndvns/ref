@@ -4,16 +4,21 @@ var conf = {};
 var rc = require('rc')('ref', conf);
 var spawn = require('child_process').spawn;
 
-var pkg = require('../package.json');
-var version = pkg.version;
 var program = require('commander');
 var commands = conf.commands;
 var options = require('../lib/options');
+var anyFormat = require('whatever-format');
+var conjoin = require('conjoin');
 
 // cli
-program
-  .version(version)
-  .usage('[options] <command>')
+program.usage('[options] <command>')
+
+// version
+var argv = process.argv;
+if ((argv[2] === '--version' || argv[2] === '-V') && !argv[3]) {
+  console.log(require('../package.json').version);
+  process.exit(0);
+}
 
 // apply options
 options(program, conf);
@@ -23,6 +28,7 @@ program.on('--help', function(){
     console.log();
     console.log('    tag                          create and push annotated tag');
     console.log('    readme                       generate Readme.md');
+    console.log('    package                      generate package.json');
     console.log('    license                      generate License');
     console.log('    render <template> <output>   render template to output');
     console.log();
@@ -43,12 +49,15 @@ var args = program.parse(process.argv);
 var rest = process.argv.slice(2);
 var cmd = rest.shift();
 
+var package = resolvePackage();
+
 if (conf.commands && conf.commands[cmd]) {
   run(parseCustom(cmd));
 } else {
   switch (cmd) {
     case 'readme': runRender('Readme.md'); break;
     case 'license': runRender('License'); break;
+    case 'package': runRender('package.json'); break;
     case 'render': runRender(); break;
     case 'tag': tag(); break;
     default:
@@ -58,9 +67,33 @@ if (conf.commands && conf.commands[cmd]) {
 }
 
 function tag(){
-  run({cmd: 'git', args: ['tag', '-a', version, '-m', 'realease ' + version]}, function(){
-    run({cmd: 'git', args: ['push', 'origin', version]});
+  var _version = package.version;
+  console.log('_version: ', _version);
+  run('git tag -a ' + _version + ' -m release ' + _version, function(){
+    run('git push origin' + _version);
   });
+}
+
+function resolvePackage(){
+  // TODO
+  // break this out
+  var _package = {};
+  var _component = {};
+  var _conf = program.projectConf ? anyFormat(program.projectConf) : {};
+  try {_package = require(process.cwd() + '/package.json')} catch(e){}
+  try {_component = require(process.cwd() + '/component.json')} catch(e){}
+  return conjoin(_conf, _package, _component);
+}
+
+function run(obj, fn){
+  fn = fn || noop;
+  if (typeof obj === 'string') obj = parseCmd(obj);
+  var proc = spawn(obj.cmd, obj.args, {stdio: 'inherit'});
+  proc.on('exit', function(code){
+    if (code > 0) return process.exit(code);
+    fn();
+  });
+  return proc;
 }
 
 function runRender(name, output){
@@ -70,6 +103,15 @@ function runRender(name, output){
   }
   output = output || name;
   return run({cmd: 'ref-render', args: [name, output].concat(rest)});
+}
+
+function parseCmd(str){
+  var args = str.split(' ');
+  var cmd = args.shift();
+  return {
+    cmd: cmd,
+    args: args
+  };
 }
 
 function parseCustom(handle){
@@ -87,15 +129,6 @@ function parseCustom(handle){
   };
 }
 
-function run(obj, fn){
-  fn = fn || noop;
-  var proc = spawn(obj.cmd, obj.args, {stdio: 'inherit'});
-  proc.on('exit', function(code){
-    if (code > 0) return process.exit(code);
-    fn();
-  });
-  return proc;
-}
 
 function logCommands(){
   var maxCmd = 0;

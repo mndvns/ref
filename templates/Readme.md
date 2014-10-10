@@ -2,6 +2,16 @@
 
 {{description}}
 
+{{#if examples}}
+## Examples
+{{#each examples}}
+
+```
+{{{this}}}
+```
+{{/each}}
+{{/if}}
+
 {{#if showDependencies}}
 {{#if dependencies}}
 Dependencies:
@@ -20,9 +30,9 @@ npm install {{name}}
 ```
 {{/if}}
 
+{{#if isCli}}
 ## Usage
 
-{{#if isCli}}
 Via `{{name}} --help`:
 
 ```sh
@@ -30,14 +40,26 @@ Via `{{name}} --help`:
 ```
 {{/if}}
 {{#if isApi}}
+## Usage
+
   ```js
   require('{{name}}');
   ```
 {{/if}}
 {{#if isStylus}}
+## Usage
+
   ```stylus
   @require '{{name}}'
   ```
+{{/if}}
+{{#if hasTests}}
+## Tests
+
+```
+npm test
+```
+
 {{/if}}
 
 ## License

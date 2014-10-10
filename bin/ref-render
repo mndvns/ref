@@ -1,21 +1,23 @@
 #!/usr/bin/env node
 
 var Handlebars = require('handlebars');
-var local = require(process.cwd() + '/package.json');
-var Path = require('path');
+var program = require('commander');
+var mdconf = require('mdconf');
+var conjoin = require('conjoin');
+var readline = require('readline');
 var exec = require('child_process').exec;
+var Path = require('path');
 var fs = require('fs');
+var options = require('../lib/options');
+
+var local;
+try {local = require(process.cwd() + '/package.json')}catch(e){local = {}};
 
 var conf = local;
 var rc = require('rc')('ref', conf);
 
-var program = require('commander');
-var options = require('../lib/options');
-
 // cli
-program
-  .version(require('../package.json').version)
-  .usage('<template> <output> [options]')
+program.usage('<template> <output> [options]')
 
 // apply options
 options(program, conf);
@@ -32,20 +34,38 @@ var rest = argv.slice(2);
 
 if (!(inFile && outFile)) program.help();
 
-var data = merge(program, local, conf);
+var data = {};
 
-if (data.isCli) {
-  exec(data.name + ' --help ' + rest.join(' '), function(err, stdout){
-    if (err) return console.error(err);
-    data.usage = stdout;
-    compile(complete);
+partial();
+
+function partial(){
+  var partialPath = process.cwd() + '/.ref/' + inFile;
+  fs.exists(partialPath, function(exists){
+    if (!exists) {
+      data = merge(program, local, {}, conf);
+      return run();
+    }
+    fs.readFile(partialPath, 'utf8', function(err, partialRaw){
+      // TODO
+      // do this for other formats
+      // json, yaml, ini
+      var parsed = mdconf(partialRaw);
+      data = merge(program, local, parsed, conf);
+      run();
+    });
   });
-} else {
-  compile(complete);
 }
 
-function complete(str){
-  console.log(str);
+function run(){
+  if (data.isCli) {
+    exec(data.name + ' --help ' + rest.join(' '), function(err, stdout){
+      if (err) return console.error(err);
+      data.usage = stdout;
+      compile(complete);
+    });
+  } else {
+    compile(complete);
+  }
 }
 
 function compile(fn){
@@ -53,14 +73,53 @@ function compile(fn){
     if (err) return console.error(err);
     var template = Handlebars.compile(str);
     var compiled = cleanup(template(data))
-    fs.writeFile(outFile, compiled, 'utf8', function(err){
-      if (err) return console.error(err);
-      fn(compiled);
-    })
+    ask('look good? [Yn]', compiled, function(answer){
+      if (answer.length && answer.charAt(0).toLowerCase() !== 'y') return;
+      fs.writeFile(outFile, compiled, 'utf8', function(err){
+        if (err) return console.error(err);
+        fn(compiled);
+      })
+    });
   });
 };
 
+function ask(question, output, fn){
+  display(output);
+  console.log();
+
+  // hide cursor
+  process.stdout.write('\033[?25l');
+
+  var rl = readline.createInterface(process.stdin, process.stderr);
+  rl.question(question + ' ', function (answer) {
+    rl.close();
+    // show cursor
+    process.stdout.write('\033[?25h');
+    fn(answer);
+  });
+}
+
+function complete(str){
+  // nothing here
+}
+
+function display(str){
+  // clear
+  process.stdout.write('\u001B[2J');
+  var code = false;
+  var arr = str.split('\n');
+  for (var i = 0, l = arr.length; i < l; i++) {
+    var val = arr[i];
+    if (/^#/.test(val)) val = '\033[37m' + val + '\033[0m';
+    if (/```/.test(val)) code = !code;
+    if (code) val = '\033[90m' + val + '\033[0m';
+    process.stdout.write('\n  ' + val);
+  }
+}
+
 function cleanup(str){
+  // TODO
+  // this thing sucks
   return str
     .replace(/\n\n\n\n\n\n/g, '\n\n')
     .replace(/\n\n\n\n\n/g, '\n\n')
@@ -68,11 +127,9 @@ function cleanup(str){
     .replace(/\n\n\n/g, '\n\n');
 }
 
-function merge(a,b,c){
-  var z = {};
-  for (var k in c) if (c.hasOwnProperty(k) && typeof c[k] !== 'function') z[k] = c[k];
-  for (var k in b) if (b.hasOwnProperty(k) && typeof b[k] !== 'function') z[k] = b[k];
-  for (var k in a) if (a.hasOwnProperty(k) && typeof a[k] !== 'function') z[k] = a[k];
+function merge(a, b, c, d){
+  var z = conjoin(a, b, c, d);
+  delete z.options;
   Object.keys(z).map(function(key){
     if (key.charAt(0) === '_') delete z[key];
   });
