@@ -7,18 +7,12 @@ var spawn = require('child_process').spawn;
 var program = require('commander');
 var commands = conf.commands;
 var options = require('../lib/options');
-var anyFormat = require('whatever-format');
-var conjoin = require('conjoin');
-
-// cli
-program.usage('[options] <command>')
+var utils = require('../lib/utils');
 
 // version
-var argv = process.argv;
-if ((argv[2] === '--version' || argv[2] === '-V') && !argv[3]) {
+getFirst('-V, --version', function(){
   console.log(require('../package.json').version);
-  process.exit(0);
-}
+});
 
 // apply options
 options(program, conf);
@@ -49,7 +43,7 @@ var args = program.parse(process.argv);
 var rest = process.argv.slice(2);
 var cmd = rest.shift();
 
-var package = resolvePackage();
+var package = utils.resolvePackage(program);
 
 if (conf.commands && conf.commands[cmd]) {
   run(parseCustom(cmd));
@@ -67,22 +61,10 @@ if (conf.commands && conf.commands[cmd]) {
 }
 
 function tag(){
-  var _version = package.version;
-  console.log('_version: ', _version);
-  run('git tag -a ' + _version + ' -m release ' + _version, function(){
-    run('git push origin' + _version);
+  var vns = package.version;
+  run({cmd: 'git', args: ['tag', '-a', vns,'-m', 'release ' + vns]} , function(){
+    run('git push origin ' + vns);
   });
-}
-
-function resolvePackage(){
-  // TODO
-  // break this out
-  var _package = {};
-  var _component = {};
-  var _conf = program.projectConf ? anyFormat(program.projectConf) : {};
-  try {_package = require(process.cwd() + '/package.json')} catch(e){}
-  try {_component = require(process.cwd() + '/component.json')} catch(e){}
-  return conjoin(_conf, _package, _component);
 }
 
 function run(obj, fn){
@@ -150,5 +132,16 @@ function logCommands(){
     console.log('    ' + cmd.handle + space1 + cmdargs + space2 + cmd.comment);
   }
 }
+
+function getFirst(str, fn){
+  var parts = str.split(', ');
+  var short = parts.shift();
+  var long = parts.shift();
+  var argv = process.argv;
+  if (!((argv[2] === short || argv[2] === long) && !argv[3])) return;
+  fn();
+  process.exit(0);
+}
+
 
 function noop(){}

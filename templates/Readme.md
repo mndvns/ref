@@ -1,6 +1,6 @@
 # {{name}}
 
-{{description}}
+{{{description}}}
 
 {{#if examples}}
 ## Examples
@@ -12,22 +12,24 @@
 {{/each}}
 {{/if}}
 
-{{#if showDependencies}}
-{{#if dependencies}}
-Dependencies:
-
-{{#each dependencies}}
-- {{@key}}
-{{/each}}
-{{/if}}
-{{/if}}
-
 {{#if published}}
 ## Installation
+{{#if isNode}}
+
+Via (npm(1))[https://www.npmjs.org/doc]:
 
 ```sh
 npm install {{name}}
 ```
+{{/if}}
+{{#if isComponent}}
+
+Via (component(1))[https://github.com/componentjs/component]:
+
+```sh
+component install {{repo}}
+```
+{{/if}}
 {{/if}}
 
 {{#if isCli}}

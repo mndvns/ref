@@ -9,6 +9,7 @@ var exec = require('child_process').exec;
 var Path = require('path');
 var fs = require('fs');
 var options = require('../lib/options');
+var utils = require('../lib/utils');
 
 var local;
 try {local = require(process.cwd() + '/package.json')}catch(e){local = {}};
@@ -34,7 +35,7 @@ var rest = argv.slice(2);
 
 if (!(inFile && outFile)) program.help();
 
-var data = {};
+var data = utils.resolvePackage(program);
 
 partial();
 
@@ -42,7 +43,8 @@ function partial(){
   var partialPath = process.cwd() + '/.ref/' + inFile;
   fs.exists(partialPath, function(exists){
     if (!exists) {
-      data = merge(program, local, {}, conf);
+      data = merge(program, local, {}, data);
+      console.log('data: ', data);
       return run();
     }
     fs.readFile(partialPath, 'utf8', function(err, partialRaw){
@@ -50,7 +52,8 @@ function partial(){
       // do this for other formats
       // json, yaml, ini
       var parsed = mdconf(partialRaw);
-      data = merge(program, local, parsed, conf);
+      data = merge(program, local, parsed, data);
+      console.log('data: ', data);
       run();
     });
   });
